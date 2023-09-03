@@ -1,0 +1,16 @@
+server:
+  port: 8848
+
+spring:
+ cloud:
+   gateway:
+     httpclient:
+       connectTimeout: 10000
+       responseTimeout: 10000
+       pool:
+         maxConnections: 100000
+         maxIdleTime: 60
+       maxHeaderSize: 10000
+#       proxy:
+#         host: proxy.example.com
+#         port: 8080
