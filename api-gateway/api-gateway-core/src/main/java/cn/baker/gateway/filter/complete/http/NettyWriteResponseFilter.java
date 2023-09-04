@@ -30,7 +30,7 @@ public class NettyWriteResponseFilter implements GlobalFilter, Ordered {
 	private static final Log log = LogFactory.getLog(NettyWriteResponseFilter.class);
 
 	/**
-	 * 所有其他过滤器之后执行
+	 * 后置过滤器，这里排序是比较靠前的
 	 */
 	public static final int WRITE_RESPONSE_FILTER_ORDER = -1;
 

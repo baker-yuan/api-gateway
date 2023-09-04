@@ -79,7 +79,7 @@ public class FilteringWebHandler implements WebHandler {
         // 插件配置存入上下文
         exchange.getAttributes().put(GATEWAY_FILTER_CONFIG_MAP, filterConfigs.stream().collect(Collectors.toMap(FilterConfig::getId, v->v, (v1, v2)->v1)));
 
-        // 排序
+        // 排序，根据`@Order`注解和`Ordered`接口对集合进行排序。值越小，优先级越高，在集合中的排序越靠前。
         AnnotationAwareOrderComparator.sort(combined);
 
         if (logger.isDebugEnabled()) {

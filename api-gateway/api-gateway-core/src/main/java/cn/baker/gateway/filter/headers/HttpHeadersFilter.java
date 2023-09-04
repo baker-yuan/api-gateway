@@ -8,10 +8,11 @@ import org.springframework.web.server.ServerWebExchange;
 public interface HttpHeadersFilter {
 
 	/**
-	 * Filters a set of Http Headers.
-	 * @param input Http Headers
-	 * @param exchange a {@link ServerWebExchange} that should be filtered
-	 * @return filtered Http Headers
+	 * 过滤http头部信息
+	 *
+	 * @param input http头部信息
+	 * @param exchange 需要被过滤的 {@link ServerWebExchange}
+	 * @return 过滤后的Http头部信息
 	 */
 	HttpHeaders filter(HttpHeaders input, ServerWebExchange exchange);
 
@@ -24,12 +25,11 @@ public interface HttpHeadersFilter {
 	static HttpHeaders filter(List<HttpHeadersFilter> filters, HttpHeaders input, ServerWebExchange exchange, Type type) {
 		if (filters != null) {
 			HttpHeaders filtered = input;
-			for (int i = 0; i < filters.size(); i++) {
-				HttpHeadersFilter filter = filters.get(i);
-				if (filter.supports(type)) {
-					filtered = filter.filter(filtered, exchange);
-				}
-			}
+            for (HttpHeadersFilter filter : filters) {
+                if (filter.supports(type)) {
+                    filtered = filter.filter(filtered, exchange);
+                }
+            }
 			return filtered;
 		}
 		return input;
@@ -41,11 +41,11 @@ public interface HttpHeadersFilter {
 
 	enum Type {
 		/**
-		 * Filter for request headers.
+		 * 用于请求头的过滤器
 		 */
 		REQUEST,
 		/**
-		 * Filter for response headers.
+		 * 用于响应头的过滤器
 		 */
 		RESPONSE
 	}
