@@ -55,15 +55,17 @@ public final class ServerWebExchangeUtils {
 
 
     /**
-     * 客户端响应
+     * 客户端响应元数据（如状态码和头部信息）
+     * reactor.netty.http.client.HttpClientResponse
      */
     public static final String CLIENT_RESPONSE_ATTR = qualify("gatewayClientResponse");
     /**
      * 客户端响应连接
+     * reactor.netty.Connection
      */
     public static final String CLIENT_RESPONSE_CONN_ATTR = qualify("gatewayClientResponseConnection");
     /**
-     * 客户端响应头
+     * 处理后的客户端响应头
      */
     public static final String CLIENT_RESPONSE_HEADER_NAMES = qualify("gatewayClientResponseHeaderNames");
     /**

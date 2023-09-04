@@ -23,9 +23,6 @@ import static cn.baker.gateway.config.HttpClientProperties.Pool.PoolType.FIXED;
 /**
  * Factory Bean that allows users to extend and customize parts of the HttpClient. Also
  * allows for testing the configuration of the HttpClient.
- *
- * @author Spencer Gibb
- * @since 3.1.1
  */
 public class HttpClientFactory extends AbstractFactoryBean<HttpClient> {
 

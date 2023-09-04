@@ -157,6 +157,10 @@ public class NettyRoutingFilter implements GlobalFilter, Ordered {
 		})
 		// 处理响应
 		.responseConnection((res, connection) -> {
+			// - `res`：代表了从服务器接收到的HTTP响应。你可以从这个对象中获取到响应的状态码、头部信息等。
+			// - `connection`：代表了与服务器的连接。你可以通过这个对象来接收响应的主体部分。
+			// `res`并不是返回的全部数据，它只包含了响应的元数据（如状态码和头部信息）。响应的主体部分需要通过`connection`来接收。
+
 			// 保存响应&链接到上下文
 			// Defer committing the response until all route filters have run
 			// Put client response as ServerWebExchange attribute and write

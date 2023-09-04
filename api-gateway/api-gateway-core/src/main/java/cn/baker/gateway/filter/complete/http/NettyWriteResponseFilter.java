@@ -57,7 +57,7 @@ public class NettyWriteResponseFilter implements GlobalFilter, Ordered {
 		// 后置过滤器
 		return chain.filter(exchange)
 				.then(Mono.defer(() -> {
-					// Connection是NettyRoutingFilter放进去的
+					// Connection是网关和下游服务之间的连接，是NettyRoutingFilter放进去的
 					Connection connection = exchange.getAttribute(CLIENT_RESPONSE_CONN_ATTR);
 					if (connection == null) {
 						return Mono.empty();
