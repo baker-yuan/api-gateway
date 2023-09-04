@@ -73,11 +73,11 @@ public class NettyRoutingFilter implements GlobalFilter, Ordered {
 
 
 	/**
-	 * 响应头处理
+	 * header处理
 	 */
 	private final ObjectProvider<List<HttpHeadersFilter>> headersFiltersProvider;
 	/**
-	 * do not use this headersFilters directly, use getHeadersFilters() instead
+	 * 不要直接使用此headersFilters，请改用getHeadersFilters()
 	 */
 	private volatile List<HttpHeadersFilter> headersFilters;
 
@@ -111,40 +111,35 @@ public class NettyRoutingFilter implements GlobalFilter, Ordered {
 	public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
 		// 获取下游url地址
 		URI requestUrl = exchange.getRequiredAttribute(GATEWAY_REQUEST_URL_ATTR);
-
 		// 获取请求协议
 		String scheme = requestUrl.getScheme();
-
 		// 请求已经被路由 url非http或https
 		if (isAlreadyRouted(exchange) || (!"http".equalsIgnoreCase(scheme) && !"https".equalsIgnoreCase(scheme))) {
 			return chain.filter(exchange);
 		}
-
 		// 标记请求已经被路由
 		setAlreadyRouted(exchange);
-
 		// 获取请求
 		ServerHttpRequest request = exchange.getRequest();
-
 		// 获取请求方式
 		final HttpMethod method = HttpMethod.valueOf(request.getMethod().name());
-
 		// 将URL对象转换为一个字符串，这个字符串中的所有非ASCII字符和特殊字符都会被转义。
 		final String url = requestUrl.toASCIIString();
 
-		//
+		// 扩展点，请求头经过HttpHeadersFilter处理
 		HttpHeaders filtered = filterRequest(getHeadersFilters(), exchange);
-
+		// 请求头
 		final DefaultHttpHeaders httpHeaders = new DefaultHttpHeaders();
 		filtered.forEach(httpHeaders::set);
 
 		// 是否需要保留原始请求的Host头
 		boolean preserveHost = exchange.getAttributeOrDefault(PRESERVE_HOST_HEADER_ATTRIBUTE, false);
-
 		// 获取路由
 		Route route = exchange.getAttribute(GATEWAY_ROUTE_ATTR);
 
-		Flux<HttpClientResponse> responseFlux = getHttpClient(route, exchange).headers(headers -> {
+		Flux<HttpClientResponse> responseFlux = getHttpClient(route, exchange)
+		// 设置请求头
+		.headers(headers -> {
 			headers.add(httpHeaders);
 			// Will either be set below, or later by Netty
 			headers.remove(HttpHeaders.HOST);
@@ -152,36 +147,48 @@ public class NettyRoutingFilter implements GlobalFilter, Ordered {
 				String host = request.getHeaders().getFirst(HttpHeaders.HOST);
 				headers.add(HttpHeaders.HOST, host);
 			}
-		}).request(method).uri(url).send((req, nettyOutbound) -> {
+		})
+		// 发起请求
+		.request(method).uri(url).send((req, nettyOutbound) -> {
 			if (log.isTraceEnabled()) {
 				nettyOutbound.withConnection(connection -> log.trace("outbound route: " + connection.channel().id().asShortText() + ", inbound: " + exchange.getLogPrefix()));
 			}
 			return nettyOutbound.send(request.getBody().map(this::getByteBuf));
-		}).responseConnection((res, connection) -> {
+		})
+		// 处理响应
+		.responseConnection((res, connection) -> {
+			// 保存响应&链接到上下文
 			// Defer committing the response until all route filters have run
 			// Put client response as ServerWebExchange attribute and write
 			// response later NettyWriteResponseFilter
 			exchange.getAttributes().put(CLIENT_RESPONSE_ATTR, res);
 			exchange.getAttributes().put(CLIENT_RESPONSE_CONN_ATTR, connection);
 
+			// res：作为客户端，向其他服务器(下游)发送请求后收到的响应
+			// response：作为服务器，需要向发起请求的客户端(外部请求)发送的响应
 			ServerHttpResponse response = exchange.getResponse();
 
+			// 存储响应头，以便HttpHeadersFilter修改响应头
 			// put headers and status so filters can modify the response
 			HttpHeaders headers = new HttpHeaders();
-
 			res.responseHeaders().forEach(entry -> headers.add(entry.getKey(), entry.getValue()));
-
+			// 存储Content-Type到上下文
 			String contentTypeValue = headers.getFirst(HttpHeaders.CONTENT_TYPE);
 			if (StringUtils.hasLength(contentTypeValue)) {
 				exchange.getAttributes().put(ORIGINAL_RESPONSE_CONTENT_TYPE_ATTR, contentTypeValue);
 			}
 
+			// 将从客户端(res)接收到的HTTP响应状态码设置到服务器(response)的HTTP响应中
 			setResponseStatus(res, response);
 
-			// make sure headers filters run after setting status so it is
-			// available in response
+			// 扩展点，HttpHeadersFilter处理
+			// make sure headers filters run after setting status so it is available in response
 			HttpHeaders filteredResponseHeaders = HttpHeadersFilter.filter(getHeadersFilters(), headers, exchange, Type.RESPONSE);
 
+			// 处理HTTP响应头中的Transfer-Encoding和Content-Length字段
+			// Transfer-Encoding和Content-Length这两个字段是互斥的，
+			// Transfer-Encoding字段表示的是传输编码方式，常见的值有chunked，表示数据是以一块一块的形式发送的。
+			// Content-Length字段表示的是实体主体的大小
 			if (!filteredResponseHeaders.containsKey(HttpHeaders.TRANSFER_ENCODING) && filteredResponseHeaders.containsKey(HttpHeaders.CONTENT_LENGTH)) {
 				// It is not valid to have both the transfer-encoding header and
 				// the content-length header.
@@ -189,11 +196,16 @@ public class NettyRoutingFilter implements GlobalFilter, Ordered {
 				// content-length header is present.
 				response.getHeaders().remove(HttpHeaders.TRANSFER_ENCODING);
 			}
+
+			// 存储处理后的响应头到上下文
 			exchange.getAttributes().put(CLIENT_RESPONSE_HEADER_NAMES, filteredResponseHeaders.keySet());
+			// 设置响应头
 			response.getHeaders().addAll(filteredResponseHeaders);
+
 			return Mono.just(res);
 		});
 
+		// 设置响应超时
 		Duration responseTimeout = getResponseTimeout(route);
 		if (responseTimeout != null) {
 			responseFlux = responseFlux
@@ -201,6 +213,7 @@ public class NettyRoutingFilter implements GlobalFilter, Ordered {
 					.onErrorMap(TimeoutException.class, th -> new ResponseStatusException(HttpStatus.GATEWAY_TIMEOUT, th.getMessage(), th));
 		}
 
+		// 当responseFlux完成后，调用过滤器链的下一个过滤器
 		return responseFlux.then(chain.filter(exchange));
 	}
 
@@ -228,7 +241,7 @@ public class NettyRoutingFilter implements GlobalFilter, Ordered {
 				response = ((ServerHttpResponseDecorator) response).getDelegate();
 			}
 			if (response instanceof AbstractServerHttpResponse) {
-				((AbstractServerHttpResponse) response).setRawStatusCode(clientResponse.status().code());
+				response.setRawStatusCode(clientResponse.status().code());
 			}
 			else {
 				throw new IllegalStateException("Unable to set status code " + clientResponse.status().code() + " on response of type " + response.getClass().getName());
@@ -298,8 +311,5 @@ public class NettyRoutingFilter implements GlobalFilter, Ordered {
 		}
 		return responseTimeout;
 	}
-
-
-
 
 }

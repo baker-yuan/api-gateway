@@ -9,6 +9,7 @@ import reactor.core.publisher.Mono;
 public interface GatewayFilterChain {
 	/**
 	 * 在过滤器链中，将处理任务委托给下一个 {@code GatewayFilter}
+	 *
 	 * @param exchange 当前的服务器交换信息
 	 * @return {@code Mono<Void>} 请求处理完成的信号
 	 */

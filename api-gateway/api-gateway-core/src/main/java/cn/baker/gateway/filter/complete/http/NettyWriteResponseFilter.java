@@ -54,6 +54,7 @@ public class NettyWriteResponseFilter implements GlobalFilter, Ordered {
 	public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
 		// NOTICE: nothing in "pre" filter stage as CLIENT_RESPONSE_CONN_ATTR is not added
 		// until the NettyRoutingFilter is run
+		// 后置过滤器
 		return chain.filter(exchange)
 				.then(Mono.defer(() -> {
 					// Connection是NettyRoutingFilter放进去的
@@ -87,8 +88,7 @@ public class NettyWriteResponseFilter implements GlobalFilter, Ordered {
 
 	protected DataBuffer wrap(ByteBuf byteBuf, ServerHttpResponse response) {
 		DataBufferFactory bufferFactory = response.bufferFactory();
-		if (bufferFactory instanceof NettyDataBufferFactory) {
-			NettyDataBufferFactory factory = (NettyDataBufferFactory) bufferFactory;
+		if (bufferFactory instanceof NettyDataBufferFactory factory) {
 			return factory.wrap(byteBuf);
 		}
 		// MockServerHttpResponse creates these
@@ -98,7 +98,7 @@ public class NettyWriteResponseFilter implements GlobalFilter, Ordered {
 			byteBuf.release();
 			return buffer;
 		}
-		throw new IllegalArgumentException("Unkown DataBufferFactory type " + bufferFactory.getClass());
+		throw new IllegalArgumentException("Unknown DataBufferFactory type " + bufferFactory.getClass());
 	}
 
 	private void cleanup(ServerWebExchange exchange) {
@@ -110,11 +110,11 @@ public class NettyWriteResponseFilter implements GlobalFilter, Ordered {
 
 	private boolean isStreamingMediaType(@Nullable MediaType contentType) {
 		if (contentType != null) {
-			for (int i = 0; i < streamingMediaTypes.size(); i++) {
-				if (streamingMediaTypes.get(i).isCompatibleWith(contentType)) {
-					return true;
-				}
-			}
+            for (MediaType streamingMediaType : streamingMediaTypes) {
+                if (streamingMediaType.isCompatibleWith(contentType)) {
+                    return true;
+                }
+            }
 		}
 		return false;
 	}
